@@ -31,6 +31,7 @@ class CountDown extends React.Component {
         timeLabelStyle: PropTypes.object,
         doubleDigitslStyle: PropTypes.object,
         separatorStyle: PropTypes.object,
+        timeToHiddenWhenEqualToZero: PropTypes.object,
         timeToShow: PropTypes.array,
         showSeparator: PropTypes.bool,
         size: PropTypes.number,
@@ -181,39 +182,80 @@ class CountDown extends React.Component {
         }
     };
 
-    renderDoubleDigits = (label, digits) => {
-        const { doubleDigitslStyle } = this.props;
+    // Kiểm tra xem co hiển thị timeType (days, hours, minutes, seconds) hay không ?
+    checkTimeToHideen = (digits, timeType, newTime) => {
+        const { timeToHiddenWhenEqualToZero } = this.props;
 
-        return (
-            <View style={[styles.doubleDigitCont, doubleDigitslStyle]}>
-                <View style={styles.timeInnerCont}>
-                    {this.renderDigit(digits)}
-                </View>
-                {this.renderLabel(label)}
-            </View>
-        );
+        // nếu không có timeToHiddenWhenEqualToZero khỏi cần check
+        if (!timeToHiddenWhenEqualToZero) return false;
+        const days = Number(newTime[0]),
+            hours = Number(newTime[1]),
+            minutes = Number(newTime[2]);
+
+        const objectTime = {
+            D:
+                timeToHiddenWhenEqualToZero?.includes(timeType) &&
+                Number(digits) === 0,
+            H:
+                timeToHiddenWhenEqualToZero?.includes(timeType) &&
+                Number(digits) === 0 &&
+                days === 0, // kiểm tra xem days === 0 thì giờ là lớn nhất có thể ẩn 00:30:30:30
+            M:
+                timeToHiddenWhenEqualToZero?.includes(timeType) &&
+                Number(digits) === 0 &&
+                days === 0 &&
+                hours === 0, // kiểm tra xem days === 0 và  hours === 0 thì phút là lớn nhất có thể ẩn 00:00:30:30
+            S:
+                timeToHiddenWhenEqualToZero?.includes(timeType) &&
+                Number(digits) === 0 &&
+                days === 0 &&
+                hours === 0 &&
+                minutes === 0, // kiểm tra xem days === 0 và  hours === 0 và minutes === 0 thì giây là lớn nhất có thể ẩn 00:00:00:30
+        };
+        return objectTime[timeType] || false;
     };
 
-    renderSeparator = () => {
+    renderDoubleDigits = (label, digits, timeType, newTime) => {
+        const { doubleDigitslStyle } = this.props;
+
+        if (!this.checkTimeToHideen(digits, timeType, newTime)) {
+            return (
+                <View style={[styles.doubleDigitCont, doubleDigitslStyle]}>
+                    <View style={styles.timeInnerCont}>
+                        {this.renderDigit(digits)}
+                    </View>
+                    {this.renderLabel(label)}
+                </View>
+            );
+        }
+        return <View />;
+    };
+
+    renderSeparator = (digits, timeType, newTime) => {
         const { separatorStyle, size } = this.props;
-        return (
-            <View style={{ justifyContent: "center", alignItems: "center" }}>
-                <Text
-                    style={[
-                        styles.separatorTxt,
-                        { fontSize: size * 1.2 },
-                        separatorStyle,
-                    ]}
+
+        if (!this.checkTimeToHideen(digits, timeType, newTime)) {
+            return (
+                <View
+                    style={{ justifyContent: "center", alignItems: "center" }}
                 >
-                    {":"}
-                </Text>
-            </View>
-        );
+                    <Text
+                        style={[
+                            styles.separatorTxt,
+                            { fontSize: size * 1.2 },
+                            separatorStyle,
+                        ]}
+                    >
+                        {":"}
+                    </Text>
+                </View>
+            );
+        }
+        return <View />;
     };
 
     renderCountDown = () => {
         const { timeToShow, timeLabels, showSeparator } = this.props;
-        const { until } = this.state;
         const { days, hours, minutes, seconds } = this.getTimeLeft();
         const newTime = sprintf(
             "%02d:%02d:%02d:%02d",
@@ -222,36 +264,57 @@ class CountDown extends React.Component {
             minutes,
             seconds
         ).split(":");
+
         const Component = this.props.onPress ? TouchableOpacity : View;
 
         return (
             <Component style={styles.timeCont} onPress={this.props.onPress}>
                 {timeToShow.includes("D")
-                    ? this.renderDoubleDigits(timeLabels.d, newTime[0])
+                    ? this.renderDoubleDigits(
+                          timeLabels.d,
+                          newTime[0],
+                          "D",
+                          newTime
+                      )
                     : null}
                 {showSeparator &&
                 timeToShow.includes("D") &&
                 timeToShow.includes("H")
-                    ? this.renderSeparator()
+                    ? this.renderSeparator(newTime[0], "D", newTime)
                     : null}
                 {timeToShow.includes("H")
-                    ? this.renderDoubleDigits(timeLabels.h, newTime[1])
+                    ? this.renderDoubleDigits(
+                          timeLabels.h,
+                          newTime[1],
+                          "H",
+                          newTime
+                      )
                     : null}
                 {showSeparator &&
                 timeToShow.includes("H") &&
                 timeToShow.includes("M")
-                    ? this.renderSeparator()
+                    ? this.renderSeparator(newTime[1], "H", newTime)
                     : null}
                 {timeToShow.includes("M")
-                    ? this.renderDoubleDigits(timeLabels.m, newTime[2])
+                    ? this.renderDoubleDigits(
+                          timeLabels.m,
+                          newTime[2],
+                          "M",
+                          newTime
+                      )
                     : null}
                 {showSeparator &&
                 timeToShow.includes("M") &&
                 timeToShow.includes("S")
-                    ? this.renderSeparator()
+                    ? this.renderSeparator(newTime[2], "M", newTime)
                     : null}
                 {timeToShow.includes("S")
-                    ? this.renderDoubleDigits(timeLabels.s, newTime[3])
+                    ? this.renderDoubleDigits(
+                          timeLabels.s,
+                          newTime[3],
+                          "S",
+                          newTime
+                      )
                     : null}
             </Component>
         );
